@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>سایت بلیط فروشی</title>
+    <style>
+        .seat {
+            width: 30px;
+            height: 30px;
+            background-color: green;
+            margin: 5px;
+            display: inline-block;
+            text-align: center;
+            line-height: 30px;
+            cursor: pointer;
+        }
+        .locked {
+            background-color: blue;
+        }
+        .sold {
+            background-color: red;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+    <script src="https://cdn.emailjs.com/dist/email.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+    <script>
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            databaseURL: "YOUR_DATABASE_URL",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        (function(){
+            emailjs.init("5ZHx2BThVgObYASXd"); // جایگزین کردن YOUR_USER_ID با User ID خود از EmailJS
+        })();
+    </script>
+</head>
+<body>
+    <div id="seating-plan">
+        <!-- صندلی‌ها را اینجا اضافه کنید -->
+        <script>
+            for (let i = 1; i <= 700; i++) {
+                document.write('<div class="seat" data-seat="' + i + '">' + i + '</div>');
+            }
+        </script>
+    </div>
+
+    <div id="login-section" class="hidden">
+        <h2>ورود</h2>
+        <input type="text" id="entry-code" placeholder="کد ورود">
+        <button onclick="login()">ورود</button>
+    </div>
+
+    <div id="form-section" class="hidden">
+        <h2>فرم اطلاعات</h2>
+        <p>صندلی انتخاب شده: <span id="selected-seat"></span></p>
+        <input type="text" id="first-name" placeholder="نام">
+        <input type="text" id="last-name" placeholder="نام خانوادگی">
+        <input type="text" id="phone-number" placeholder="شماره تماس">
+        <button onclick="submitForm()">ارسال</button>
+    </div>
+
+    <button onclick="downloadCSV()">دانلود فایل CSV</button>
+
+    <script>
+        let selectedSeat = null;
+        let entryCode = null;
+        let seatOwners = [];
+
+        document.querySelectorAll('.seat').forEach(seat => {
+            seat.addEventListener('click', function() {
+                if (!this.classList.contains('locked') && !this.classList.contains('sold')) {
+                    this.classList.add('locked');
+                    selectedSeat = this.dataset.seat;
+                    entryCode = Math.random().toString(36).substr(2, 8);
+                    let price;
+                    if (selectedSeat <= 300) {
+                        price = 450000;
+                    } else if (selectedSeat <= 500) {
+                        price = 400000;
+                    } else {
+                        price = 300000;
+                    }
+                    alert('اکنون به شما یک ک داده می شود که منظور کد ورود و بلیط شماست . لطفا آن را کپی کنید و در حفظ آن کوشا باشید .' + entryCode)
+                    alert('کد ورود شما : ' + entryCode);
+                    alert('مبلغ بلیط: ' + price + ' تومان\nشماره کارت: 1234-5678-9012-3456');
+                    document.getElementById('login-section').classList.remove('hidden');
+                    // قفل کردن صندلی برای ۳ ساعت
+                    setTimeout(() => {
+                        this.classList.remove('locked');
+                    }, 3 * 60 * 60 * 1000);
+                }
+            });
+        });
+
+        function login() {
+            const enteredCode = document.getElementById('entry-code').value;
+            if (enteredCode === entryCode) {
+                document.getElementById('selected-seat').innerText = selectedSeat;
+                document.getElementById('form-section').classList.remove('hidden');
+            } else {
+                alert('کد ورود نادرست است');
+            }
+        }
+
+        function submitForm() {
+            const firstName = document.getElementById('first-name').value;
+            const lastName = document.getElementById('last-name').value;
+            const phoneNumber = document.getElementById('phone-number').value;
+            if (firstName && lastName && phoneNumber) {
+                emailjs.send('service_6xu26ce', 'template_sj64mx7', {
+                    first_name: firstName,
+                    last_name: lastName,
+                    phone_number: phoneNumber,
+                    selected_seat: selectedSeat,
+                    to_email: 'm.sobhan.kazemkhani@gmail.com'
+                }).then(function(response) {
+                    alert('اطلاعات با موفقیت ارسال شد');
+                    document.querySelector('.seat[data-seat="' + selectedSeat + '"]').classList.remove('locked');
+                    document.querySelector('.seat[data-seat="' + selectedSeat + '"]').classList.add('sold');
+                    seatOwners.push({seat: selectedSeat, firstName: firstName, lastName: lastName, phone: phoneNumber});
+                    firebase.database().ref('seats/' + selectedSeat).set({
+                        firstName: firstName,
+                        lastName: lastName,
+                        phone: phoneNumber,
+                        status: 'sold'
+                    });
+                }, function(error) {
+                    alert('خطا در ارسال اطلاعات: ' + JSON.stringify(error));
+                });
+            } else {
+                alert('لطفا تمامی فیلدها را پر کنید');
+            }
+        }
+
+        function downloadCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Seat,First Name,Last Name,Phone Number\n";
+            seatOwners.forEach(function(rowArray) {
+                let row = rowArray.seat + "," + rowArray.firstName + "," + rowArray.lastName + "," + rowArray.phone;
+                csvContent += row + "\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "seat_owners.csv");
+            document.body.appendChild(link);
+            link.click();
+        }
+
+        function loadSeats() {
+            firebase.database().ref('seats').once('value', function(snapshot) {
+                snapshot.forEach(function(childSnapshot) {
+                    const seatData = childSnapshot.val();
+                    const seatElement = document.querySelector('.seat[data-seat="' + childSnapshot.key + '"]');
+                    if (seatData.status === 'sold') {
+                        seatElement.classList.add('sold');
+                    }
+                    seatOwners.push({
+                        seat: childSnapshot.key,
+                        firstName: seatData.firstName,
+                        lastName: seatData.lastName,
+                        phone: seatData.phone
+                    });
+                });
+            });
+        }
+
+        window.onload = function() {
+            loadSeats();
+        };
+    </script>
+</body>
+</html>
