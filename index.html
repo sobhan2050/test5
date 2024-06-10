@@ -108,7 +108,7 @@
 
         function login() {
             const enteredCode = document.getElementById('entry-code').value;
-            if (enteredCode === entryCode) {
+if (enteredCode === entryCode) {
                 document.getElementById('selected-seat').innerText = selectedSeat;
                 document.getElementById('form-section').classList.remove('hidden');
             } else {
@@ -155,8 +155,6 @@
             });
 
             const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
             link.setAttribute("download", "seat_owners.csv");
